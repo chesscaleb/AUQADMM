@@ -138,10 +138,12 @@ def Initialization(SAMPLE_NUM_EACH_WORKER, DATASET_NAME, LOSS_NAME, wopt_str):
 
 
 def Generate_and_Classify_Trainsets(Number_of_Samples_each_worker, Target_Dataset_Name, TrainLoader, LOSS_NAME):
-    #Number_of_Samples_each_worker: number of samples assigned to each worker, like 2000, 2500 or so
-    #Target_Dataset_Name: 'MNIST' or 'CIFAR10' or 'SVHN'
-    #TrainLoader: trainloader containing datasets
-    #LOSS_NAME: 'Multinomial' or 'Elastic_Net' or 'Smoothed_SVM'
+    '''
+    Number_of_Samples_each_worker: number of samples assigned to each worker, like 2000, 2500 or so
+    Target_Dataset_Name: 'MNIST' or 'CIFAR10' or 'SVHN'
+    TrainLoader: trainloader containing datasets
+    LOSS_NAME: 'Multinomial' or 'Elastic_Net' or 'Smoothed_SVM'
+      '''
     N = Number_of_Samples_each_worker
     if Target_Dataset_Name == 'MNIST':
         M = 28*28
@@ -264,16 +266,18 @@ def Generate_and_Classify_Trainsets(Number_of_Samples_each_worker, Target_Datase
 
 #Lanczos Algorithm
 def manual_Lanczos(f, x, q1, rank):
-    ##INPUTS:
-    #f: objective function
-    #x: the point at which the gradient and Hessian are evaluated
-    #q1: initial vector
-    #rank: desired rank number for the approximation QTQ^t
+    '''
+    Lanczos
+    #INPUTS:
+    f: objective function
+    x: the point at which the gradient and Hessian are evaluated
+    q1: initial vector
+    rank: desired rank number for the approximation QTQ^t
     
-    ##OUTPUTS:
-    #Qt: transpose of Q
-    #T: the triadiagonal matrix T
-    
+    #OUTPUTS:
+    Qt: transpose of Q
+    T: the triadiagonal matrix T
+    '''
     k = 0
     beta = 1.0
     q = torch.zeros_like(q1)
@@ -312,35 +316,19 @@ def manual_Lanczos(f, x, q1, rank):
     
     return [torch.tensor(Qt).clone().detach(), T.clone().detach()]
 
+#Loss Function
+def FullLoss(trainset, function, x):
+    '''
+        Calculates the loss from the features (trainset) and the input (x)
+        with the loss function (function)
+    '''
 
-### Loss Function ###
-def FullLoss(trainset, x, N, M, LOSS_NAME):
-    if LOSS_NAME == 'Multinomial':
-        loss = nn.CrossEntropyLoss()
-        output = 0
-        X, y = trainset
-        X = X.view(-1, M)
-        input = torch.mm(X, x)
-        output += loss(input,y)/(N*1.0)
-        return output
-    elif LOSS_NAME == 'Elastic_Net':
-        loss = nn.MSELoss()
-        output = 0
-        X, y = trainset
-        X = X.view(-1, M)
-        input = torch.mm(X, x)
-        y = y.reshape(X.shape[0],1)
-        y = y.type(torch.FloatTensor)
-        output += loss(input,y)
-        return output
-    elif LOSS_NAME == 'Smoothed_SVM':
-        def j(u, eps):
-            return 0.5*(u+torch.sqrt(eps**2+u**2))
-
-        def hinge_loss(X, u, y, eps):
-            return torch.mean(j(1-y*torch.mm(X,u),eps))
-
-        X, y = trainset
-        eps = 1.0/5000.0
-        return hinge_loss(X, x, y, eps)
-
+    loss = function
+    output = 0
+    X, y = trainset
+    X = X.view(-1, M)
+    input = torch.mm(X, x)
+    y = y.unsqueeze(1)
+    y = y.type(torch.FloatTensor)
+    output += loss(input,y)
+    return output
