@@ -1,8 +1,7 @@
 #AUQADMM CLASS
 
 class AUQADMM:
-    def __init__(self, params, regularizer, rho1, rho2, trainsets, LOSS_NAME):
-        self.LOSS_NAME = LOSS_NAME
+    def __init__(self, params, regularizer, rho1, rho2, trainsets):
         self.U = params
         dim1 = params[0].shape[0]; dim2 = params[0].shape[1];
         self.dim = 1.0*dim1*dim2
@@ -23,7 +22,6 @@ class AUQADMM:
         self.diagonalweights = []
 
         self.V = torch.zeros_like(self.U[0])
-        self.M = [*self.V.shape][0]
 
         self.loss = []
 
@@ -33,25 +31,30 @@ class AUQADMM:
             self.dlambdas.append(torch.zeros_like(u))
             self.Hessians.append(0)
             self.diagonalweights.append(0)
-
-    #Affine Normalization such that all elements of target X are in a range [a,b]
+            
     def affine_normalize(self, a, b, X):
-        #a,b: range of cutoff
-        #X: target
-
+    '''
+        Affine Normalization such that all elements 
+        of target X are in a range [a,b]
+        a,b: range of cutoff
+        X: target
+        '''
         q = max(X).item()
         p = min(X).item()
+        #print('q,p: ', q, p)
         m = (b-a)/(q-p)
         n = a - m*p
         return m*X+n
-
-    #Generate Diagonal Weights, return weight and the normalization factor gamma
-    def GenerateDiagWeights(self, trainset, rank, u, a, b, N, M, LOSS_NAME):
+    
+    def GenerateDiagWeights(trainset, function, rank, u, a, b):
+      '''
+        #Generate Diagonal Weights, return weight and the normalization factor gamma
+      '''
         dim1 = u.shape[0]
         dim2 = u.shape[1]
-        
+
         def f(c):
-            return FullLoss(trainset, c, N, M, LOSS_NAME)
+            return FullLoss(trainset, function, c)
 
         q1 = torch.randn(dim1,dim2)
         q1 = 1.0/torch.norm(q1)*q1
@@ -66,58 +69,59 @@ class AUQADMM:
 
         return Hdiag
     
-    #LBFGS Algorithm for U Updates
-    def UpdateLocalLBFGS(self, U, V, lam, w, trainset, epochs, N, M, LOSS_NAME):
+    def UpdateLocalLBFGS(self, U, V, lam, w, trainset, function, epochs):
+       '''
+          Updates the local variable using LBFGS
+       '''
         optimizer = optim.LBFGS([U],max_iter=4, history_size=20 ,lr = 1e-3)
 
         for epoch in range(epochs):
             def closure():
                 if torch.is_grad_enabled():
                     optimizer.zero_grad()
-                loss = self.LocalCost(trainset, U, V, lam, w, N, M, LOSS_NAME)
+                loss = self.LocalCost(trainset, function, U, V, lam, w)
                 if loss.requires_grad:
                     loss.backward(retain_graph=True)
                 return loss
             optimizer.step(closure)
         return U
     
-    #Lambda Updates
     def UpdateLambda(self, U, V, lambdas, w):
+        '''
+          Updates the dual variables
+        '''
         with torch.no_grad():    
             for count, u in enumerate(U):
-                lambdas[count] = copy.deepcopy(lambdas[count])
                 lambdas[count] = torch.add(lambdas[count], w[count]*(V - u))
         return lambdas
-
-    #Interval Update
+    
     def UpdateInterval(self, k, a1, b1, a, b, K):
+        '''
+          Updates the interval
+        '''
         if k%K==0:
             i = k*1.0/(K*1.0)
             gam = 1.0/(i+1)**2*b1/a1+1-1/(i+1)**2
             b = gam*a
         return [a,b]
     
-    #Local Cost for workers u_j in ADMM
-    def LocalCost(self, trainset, u, v, lam, w, N, M, LOSS_NAME):
-        objfunc = FullLoss(trainset, u, N, M, LOSS_NAME)
+    def LocalCost(self, trainset, function, u, v, lam, w):
+        '''
+            Performs one local update of AUQ-ADMM
+        '''
+        objfunc = FullLoss(trainset, function, u)
         extra_terms = 0
         diff = v - u
         res = diff + 1/w*lam
-        
-        extra_terms = 0.5*((res*w*res).sum())
 
-        return objfunc + extra_terms    
+        extra_terms = (res*w*res).sum()
 
-    #Regularizer Loss in ADMM
-    def regularizer_loss(self, x_list, y_list, z, tau_list):
-        extra_terms = 0
-        for i in range(len(x_list)):
-            norm_sq = (z - x_list[i] + y_list[i]/tau_list[i]).pow(2).sum()
-            extra_terms += 0.5*tau_list[i]*norm_sq
-        return self.regularizer(z) + extra_terms
-
-    #Proximal Algorithm for V Update
+        return objfunc + extra_terms
+    
     def proximal(self, rho1, rho2, U, lambdas, diag_Weight_list):
+        '''
+            Performs the proximal update of the global variable
+        '''
         threshold = torch.nn.Threshold(0,0)
         X = torch.zeros_like(U[0])
         K = rho2*torch.ones_like(diag_Weight_list[0])
@@ -127,16 +131,13 @@ class AUQADMM:
         value = rho1
         V = 1.0/K*threshold(abs(X)-value)*torch.sign(X)
         return V
-
-    #Optimization Function
-    def fit(self, wopt, maxiter=1, X_EPOCHS=3, abs_tol=1e-5, rel_tol=1e-4, rank=5, a=0.5, b=1.5, closure=None, Nesterov=False, K=1000):
-        a0 = a; b0 = b
+    
+    def fit(self, function, wopt, maxiter=1, X_EPOCHS=3, abs_tol=1e-5, rel_tol=1e-4, rank=5, a=0.5, b=1.5, closure=None, Nesterov=False, K=1):
+        a0 = a; b0 = b #restriction interval initialization
         primal_residual = [] #primal_residual
         dual_residual = [] #dual_residual
         primal_residual_wopt = [] #primal_residual in wopt norm
         dual_residual_wopt = [] #dual_residual in wopt norm
-        M = self.M
-        LOSS_NAME = self.LOSS_NAME
         
         if Nesterov == True:
             lam_tilda = []
@@ -162,18 +163,18 @@ class AUQADMM:
             #Generate weights and update u
             for it, trainset in enumerate(self.trainsets):
                 #Generate Diagonal Hessian Weights
-                self.diagonalweights[it] = self.GenerateDiagWeights(trainset, rank, self.U[it].clone().detach(), a, b, 1.0, M, LOSS_NAME) ###
+                self.diagonalweights[it] = self.GenerateDiagWeights(trainset, rank, self.U[it].clone().detach(), a, b)
 
                 #Update u
                 if Nesterov == True:
-                    self.U[it] = self.UpdateLocalLBFGS(self.U[it], v_tilda, lam_tilda[it], self.diagonalweights[it], trainset, X_EPOCHS, 1.0, M, LOSS_NAME) ###
+                    self.U[it] = self.UpdateLocalLBFGS(self.U[it], v_tilda, lam_tilda[it], self.diagonalweights[it], trainset, function, X_EPOCHS)
                 else:
-                    self.U[it] = self.UpdateLocalLBFGS(self.U[it], self.V, self.lambdas[it], self.diagonalweights[it], trainset, X_EPOCHS, 1.0, M, LOSS_NAME) ###
+                    self.U[it] = self.UpdateLocalLBFGS(self.U[it], self.V, self.lambdas[it], self.diagonalweights[it], trainset, function, X_EPOCHS)
+             
             
             #Update Interval
             a, b = self.UpdateInterval(i+1, a0, b0, a, b, K)
-            print('a', a)
-            print('b', b)
+            
 
             #Save the norm of u and total loss in each iteration
             u_norm = []
@@ -181,6 +182,7 @@ class AUQADMM:
                 u_norm.append(torch.norm(u))
 
             #Update v and lambda
+            
             with torch.no_grad():
                 if Nesterov == True:
                     theta_pre = theta
@@ -206,7 +208,8 @@ class AUQADMM:
             
             loss = 0
             for it, trainset in enumerate(self.trainsets):
-                loss += FullLoss(trainset, self.V, self.Workers, M, LOSS_NAME)    
+                loss += FullLoss(trainset, function, self.V)
+            print('f + g %e' % loss, end='       ')    
             loss += self.regularizer(self.V)
             self.loss.append(loss)
 
@@ -257,7 +260,6 @@ class AUQADMM:
                 
                 print('primal residual: ', pr)
                 print('dual residual:', dr)
-                
 
             primal_residual.append(pr)
             primal_residual_wopt.append(pr_wopt)
