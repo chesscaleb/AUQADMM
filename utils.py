@@ -82,61 +82,6 @@ def svhn_loaders(train_batch_size, test_batch_size=None):
         batch_size=test_batch_size, shuffle=False)
     return train_loader, test_loader
 
-
-def Initialization(SAMPLE_NUM_EACH_WORKER, DATASET_NAME, LOSS_NAME, wopt_str):
-    train_batch_size = 1
-    if DATASET_NAME == 'MNIST':
-        [trainLoader, testLoader] = mnist_loaders(train_batch_size, test_batch_size=None)
-    elif DATASET_NAME == 'CIFAR10':
-        [trainLoader, testLoader] = cifar_loaders(train_batch_size, test_batch_size=None, augment=False)
-    elif DATASET_NAME == 'SVHN':
-        [trainLoader, testLoader] = svhn_loaders(train_batch_size, test_batch_size=None)
-    
-    trainsets = Generate_and_Classify_Trainsets(SAMPLE_NUM_EACH_WORKER, DATASET_NAME, trainLoader, LOSS_NAME)
-    wopt_list = torch.load('wopt.pth')
-
-    if DATASET_NAME == 'MNIST':
-        wopt = wopt_list['AUQADMM_2000_250_MNIST']
-        m = 784
-    else:
-        wopt = wopt_list['AUQADMM_2000_250_CIFAR10']
-        m = 3072
-
-    params = []
-
-    if LOSS_NAME == 'Multinomial':
-        x1 = torch.randn(m,10,requires_grad=True)
-        x2 = torch.randn(m,10,requires_grad=True)
-        x3 = torch.randn(m,10,requires_grad=True)
-        x4 = torch.randn(m,10,requires_grad=True)
-        x5 = torch.randn(m,10,requires_grad=True)
-        x6 = torch.randn(m,10,requires_grad=True)
-        x7 = torch.randn(m,10,requires_grad=True)
-        x8 = torch.randn(m,10,requires_grad=True)
-        x9 = torch.randn(m,10,requires_grad=True)
-        x10 = torch.randn(m,10,requires_grad=True)
-        params = [x1, x2, x3, x4, x5, x6, x7, x8, x9, x10]
-        return [params, trainsets, wopt]
-    elif LOSS_NAME == 'Elastic_Net':
-        x1 = torch.randn(m,1,requires_grad=True)
-        x2 = torch.randn(m,1,requires_grad=True)
-        x3 = torch.randn(m,1,requires_grad=True)
-        x4 = torch.randn(m,1,requires_grad=True)
-        x5 = torch.randn(m,1,requires_grad=True)
-        x6 = torch.randn(m,1,requires_grad=True)
-        x7 = torch.randn(m,1,requires_grad=True)
-        x8 = torch.randn(m,1,requires_grad=True)
-        x9 = torch.randn(m,1,requires_grad=True)
-        x10 = torch.randn(m,1,requires_grad=True)
-        params = [x1, x2, x3, x4, x5, x6, x7, x8, x9, x10]
-        return [params, trainsets, wopt]
-    else:
-        x1 = torch.randn(m,1,requires_grad=True)
-        x2 = torch.randn(m,1,requires_grad=True)
-        params = [x1, x2]
-        return [params, trainsets, wopt]
-
-
 def Generate_and_Classify_Trainsets(Number_of_Samples_each_worker, Target_Dataset_Name, TrainLoader, LOSS_NAME):
     '''
     Number_of_Samples_each_worker: number of samples assigned to each worker, like 2000, 2500 or so
