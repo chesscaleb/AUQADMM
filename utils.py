@@ -250,16 +250,18 @@ def Generate_and_Classify_Trainsets(Number_of_Samples_each_worker, Target_Datase
 
 #Lanczos Algorithm
 def manual_Lanczos(f, x, q1, rank):
-    ##INPUTS:
-    #f: objective function
-    #x: the point at which the gradient and Hessian are evaluated
-    #q1: initial vector
-    #rank: desired rank number for the approximation QTQ^t
+    '''
+    Lanczos
+    #INPUTS:
+    f: objective function
+    x: the point at which the gradient and Hessian are evaluated
+    q1: initial vector
+    rank: desired rank number for the approximation QTQ^t
     
-    ##OUTPUTS:
-    #Qt: transpose of Q
-    #T: the triadiagonal matrix T
-    
+    #OUTPUTS:
+    Qt: transpose of Q
+    T: the triadiagonal matrix T
+    '''
     k = 0
     beta = 1.0
     q = torch.zeros_like(q1)
@@ -299,6 +301,12 @@ def manual_Lanczos(f, x, q1, rank):
     return [torch.tensor(Qt).clone().detach(), T.clone().detach()]
 
 def FullLoss(loss_function, trainset, x, N, M):
+    '''
+    Calculates the loss from the features (trainset) and the input (x)
+    with the loss function (loss_function). 
+    N = number of samples per worker. 
+    M = dimension of training data
+    '''
     return loss_function(trainset, x, N, M)
 
 def Multinomial(trainset, x, N, M):
