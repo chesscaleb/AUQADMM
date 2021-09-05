@@ -134,8 +134,19 @@ class AUQADMM:
         V = 1.0/K*threshold(abs(X)-value)*torch.sign(X)
         return V
 
-    #Optimization Function
     def fit(self, maxiter=1, X_EPOCHS=3, abs_tol=1e-5, rel_tol=1e-4, rank=5, a=0.5, b=1.5, closure=None, K=1000):
+        '''
+        Optimization Function:
+        Parameters:
+        maxiter = maximum iterations that AUQ-ADMM runs
+        X_EPOCHS = iterations that LBFGS runs to optimize the local variable
+        abs_tol = absolute stopping tolerance 
+        rel_tol = relative stopping tolerance
+        rank = rank for the lanczos algorithm
+        a, b = starting points of the restriction interval
+        closure = for LBFGS optimization
+        K = iteration in which to reset
+        '''
         a0 = a; b0 = b
         primal_residual = [] #primal_residual
         dual_residual = [] #dual_residual
