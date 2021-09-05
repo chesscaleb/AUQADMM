@@ -34,19 +34,23 @@ class AUQADMM:
             self.Hessians.append(0)
             self.diagonalweights.append(0)
 
-    #Affine Normalization such that all elements of target X are in a range [a,b]
     def affine_normalize(self, a, b, X):
-        #a,b: range of cutoff
-        #X: target
-
+        '''
+        Affine Normalization such that all elements 
+        of target X are in a range [a,b]
+        a,b: range of cutoff
+        X: target
+        '''
         q = max(X).item()
         p = min(X).item()
         m = (b-a)/(q-p)
         n = a - m*p
         return m*X+n
 
-    #Generate Diagonal Weights, return weight and the normalization factor gamma
     def GenerateDiagWeights(self, trainset, rank, u, a, b, N, M, LOSS_NAME):
+      '''
+        #Generate Diagonal Weights, return weight and the normalization factor gamma
+      '''
         dim1 = u.shape[0]
         dim2 = u.shape[1]
         
@@ -66,8 +70,10 @@ class AUQADMM:
 
         return Hdiag
     
-    #LBFGS Algorithm for U Updates
     def UpdateLocalLBFGS(self, U, V, lam, w, trainset, epochs, N, M, LOSS_NAME):
+       '''
+         Updates the local variable using LBFGS
+         '''
         optimizer = optim.LBFGS([U],max_iter=4, history_size=20 ,lr = 1e-3)
 
         for epoch in range(epochs):
@@ -81,24 +87,30 @@ class AUQADMM:
             optimizer.step(closure)
         return U
     
-    #Lambda Updates
     def UpdateLambda(self, U, V, lambdas, w):
+        '''
+        Updates the dual variables
+        '''
         with torch.no_grad():    
             for count, u in enumerate(U):
                 lambdas[count] = copy.deepcopy(lambdas[count])
                 lambdas[count] = torch.add(lambdas[count], w[count]*(V - u))
         return lambdas
 
-    #Interval Update
     def UpdateInterval(self, k, a1, b1, a, b, K):
+        '''
+          Updates the interval
+        '''
         if k%K==0:
             i = k*1.0/(K*1.0)
             gam = 1.0/(i+1)**2*b1/a1+1-1/(i+1)**2
             b = gam*a
         return [a,b]
     
-    #Local Cost for workers u_j in ADMM
     def LocalCost(self, trainset, u, v, lam, w, N, M, LOSS_NAME):
+        '''
+        Performs one local update of AUQ-ADMM
+        '''
         objfunc = FullLoss(LOSS_NAME, trainset, u, N, M)
         extra_terms = 0
         diff = v - u
@@ -108,16 +120,10 @@ class AUQADMM:
 
         return objfunc + extra_terms    
 
-    #Regularizer Loss in ADMM
-    def regularizer_loss(self, x_list, y_list, z, tau_list):
-        extra_terms = 0
-        for i in range(len(x_list)):
-            norm_sq = (z - x_list[i] + y_list[i]/tau_list[i]).pow(2).sum()
-            extra_terms += 0.5*tau_list[i]*norm_sq
-        return self.regularizer(z) + extra_terms
-
-    #Proximal Algorithm for V Update
     def proximal(self, rho1, rho2, U, lambdas, diag_Weight_list):
+        '''
+        Performs the proximal update of the global variable
+        '''
         threshold = torch.nn.Threshold(0,0)
         X = torch.zeros_like(U[0])
         K = rho2*torch.ones_like(diag_Weight_list[0])
