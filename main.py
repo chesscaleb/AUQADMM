@@ -22,7 +22,7 @@ import time
 ##PREPARATIONS (Trainsets, Initial U)
 SAMPLE_NUM_EACH_WORKER = 1000
 DATASET_NAME = 'MNIST'
-LOSS_NAME = 'Elastic_Net' #or 'Multinomial' or 'Smoothed_SVM', 
+LOSS_NAME = 'ElasticNet' #or 'Multinomial' or 'SmoothedSVM', 
                           #but if they are not the desired loss functions, 
                           #please directly input the loss function, e.g. nn.MSELoss()
 
