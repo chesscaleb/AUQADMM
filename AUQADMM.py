@@ -99,7 +99,7 @@ class AUQADMM:
     
     #Local Cost for workers u_j in ADMM
     def LocalCost(self, trainset, u, v, lam, w, N, M, LOSS_NAME):
-        objfunc = FullLoss(trainset, u, N, M, LOSS_NAME)
+        objfunc = FullLoss(LOSS_NAME, trainset, u, N, M)
         extra_terms = 0
         diff = v - u
         res = diff + 1/w*lam
@@ -172,7 +172,7 @@ class AUQADMM:
             
             loss = 0
             for it, trainset in enumerate(self.trainsets):
-                loss += FullLoss(trainset, self.V, self.Workers, M, LOSS_NAME)    
+                loss += FullLoss(LOSS_NAME, trainset, self.V, self.Workers, M)    
             loss += self.regularizer(self.V)
             self.loss.append(loss)
 
